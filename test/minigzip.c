@@ -61,7 +61,11 @@
 #endif
 #define SUFFIX_LEN (sizeof(GZ_SUFFIX)-1)
 
+#ifdef S390_DFLTCC
+#define BUFLEN      262144       /* DFLTCC works faster with larger buffers */
+#else
 #define BUFLEN      16384        /* read buffer size */
+#endif
 #define BUFLENW     (BUFLEN * 3) /* write buffer size */
 #define MAX_NAME_LEN 1024
 
