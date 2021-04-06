@@ -5,6 +5,7 @@
 
 #include "zbuild.h"
 #include "zendian.h"
+#include "crc32_p.h"
 #include "deflate.h"
 #include "deflate_p.h"
 
@@ -95,11 +96,8 @@ Z_INTERNAL uint32_t crc32_generic(uint32_t, const unsigned char *, uint64_t);
 #ifdef ARM_ACLE_CRC_HASH
 extern uint32_t crc32_acle(uint32_t, const unsigned char *, uint64_t);
 #endif
-
-#if BYTE_ORDER == LITTLE_ENDIAN
-extern uint32_t crc32_little(uint32_t, const unsigned char *, uint64_t);
-#elif BYTE_ORDER == BIG_ENDIAN
-extern uint32_t crc32_big(uint32_t, const unsigned char *, uint64_t);
+#ifdef S390_CRC32_VX
+extern uint32_t s390_crc32_vx(uint32_t, const unsigned char *, uint64_t);
 #endif
 
 /* compare258 */
@@ -147,6 +145,8 @@ Z_INTERNAL void cpu_check_features(void)
     arm_check_features();
 #elif defined(POWER_FEATURES)
     power_check_features();
+#elif defined(S390_FEATURES)
+    s390_check_features();
 #endif
     features_checked = 1;
 }
@@ -389,6 +389,10 @@ Z_INTERNAL uint32_t crc32_stub(uint32_t crc, const unsigned char *buf, uint64_t 
 #  endif
 #elif BYTE_ORDER == BIG_ENDIAN
         functable.crc32 = crc32_big;
+#  if defined(S390_CRC32_VX)
+        if (s390_cpu_has_vx)
+            functable.crc32 = s390_crc32_vx;
+#  endif
 #else
 #  error No endian defined
 #endif
