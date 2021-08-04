@@ -212,5 +212,59 @@ access to an IBM z15+ VM or LPAR in order to test DFLTCC support. Since
 DFLTCC is a non-privileged instruction, neither special VM/LPAR
 configuration nor root are required.
 
-Still, zlib-ng CI has a few QEMU TCG-based configurations that check
-whether fallback to software is working.
+zlib-ng CI uses an IBM-provided z15 self-hosted builder for the DFLTCC
+testing. There are no IBM Z builds of GitHub Actions runner, and
+stable qemu-user has problems with .NET apps, so the builder runs the
+x86_64 runner version with qemu-user built from the master branch.
+
+## Configuring the builder.
+
+### Install prerequisites.
+
+```
+$ sudo dnf install docker
+```
+
+### Add services.
+
+```
+$ sudo cp self-hosted-builder/*.service /etc/systemd/system/
+$ sudo systemctl daemon-reload
+```
+
+### Create a config file.
+
+```
+$ sudo tee /etc/actions-runner
+repo=<owner>/<name>
+access_token=<ghp_***>
+```
+
+Access token should have the repo scope, consult
+https://docs.github.com/en/rest/reference/actions#create-a-registration-token-for-a-repository
+for details.
+
+### Autostart the x86_64 emulation support.
+
+```
+$ sudo systemctl enable --now qemu-user-static
+```
+
+### Autostart the runner.
+
+```
+$ sudo systemctl enable --now actions-runner
+```
+
+## Rebuilding the image
+
+In case new dependencies need to be added, the `iiilinuxibmcom/actions-runner`
+image can be rebuilt as follows:
+
+```
+$ vim self-hosted-builder/actions-runner.Dockerfile
+$ sudo docker build \
+      -f self-hosted-builder/actions-runner.Dockerfile \
+      -t iiilinuxibmcom/actions-runner
+$ sudo systemctl restart actions-runner
+```
