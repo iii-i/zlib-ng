@@ -1,0 +1,17 @@
+[Unit]
+Description=Self-Hosted IBM Z Github Actions Runner
+Wants=qemu-user-static
+After=qemu-user-static
+
+[Service]
+Type=simple
+ExecStart=docker run \
+              --rm \
+              --interactive \
+              --init \
+              --volume=actions-runner:/home/actions-runner \
+              iiilinuxibmcom/actions-runner \
+              ./run.sh
+
+[Install]
+WantedBy=multi-user.target
