@@ -23,6 +23,12 @@
 #ifndef DFLTCC_RIBM
 #define DFLTCC_RIBM 0
 #endif
+#ifndef DFLTCC_BUF_SIZE
+#define DFLTCC_BUF_SIZE 262144
+#endif
+#ifndef DFLTCC_BUF_THRESHOLD
+#define DFLTCC_BUF_THRESHOLD 98304
+#endif
 
 /*
    Parameter Block for Query Available Functions.
