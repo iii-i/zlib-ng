@@ -36,7 +36,7 @@ Z_INTERNAL uint8_t* CHUNKCOPY(uint8_t *out, uint8_t const *from, unsigned len) {
     len -= align;
     while (len > 0) {
         loadchunk(from, &chunk);
-        storechunk(out, &chunk);
+        memcpy(out, chunk, sizeof(uint64_t));
         out += sizeof(chunk_t);
         from += sizeof(chunk_t);
         len -= sizeof(chunk_t);
