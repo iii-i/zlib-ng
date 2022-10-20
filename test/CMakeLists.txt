@@ -161,6 +161,7 @@ else()
         test_inflate_sync.cc
         test_large_buffers.cc
         test_small_buffers.cc
+        test_small_window.cc
         test_version.cc
         )
 

@@ -63,9 +63,9 @@ integrated with the rest of zlib-ng using hook macros.
 DFLTCC takes as arguments a parameter block, an input buffer, an output
 buffer and a window. `ZALLOC_DEFLATE_STATE()`, `ZALLOC_INFLATE_STATE()`,
 `ZFREE_STATE()`, `ZCOPY_DEFLATE_STATE()`, `ZCOPY_INFLATE_STATE()`,
-`ZALLOC_WINDOW()` and `TRY_FREE_WINDOW()` macros encapsulate allocation
-details for the parameter block (which is allocated alongside zlib-ng
-state) and the window (which must be page-aligned).
+`ZALLOC_WINDOW()`, `ZCOPY_WINDOW()` and `TRY_FREE_WINDOW()` macros encapsulate
+allocation  details for the parameter block (which is allocated alongside
+zlib-ng state) and the window (which must be page-aligned and large enough).
 
 While inflate software and hardware window formats match, this is not
 the case for deflate. Therefore, `deflateSetDictionary()` and

@@ -1327,8 +1327,7 @@ int32_t Z_EXPORT PREFIX(inflateCopy)(PREFIX3(stream) *dest, PREFIX3(stream) *sou
     }
     copy->next = copy->codes + (state->next - state->codes);
     if (window != NULL) {
-        wsize = 1U << state->wbits;
-        memcpy(window, state->window, wsize);
+        ZCOPY_WINDOW(window, state->window, 1U << state->wbits);
     }
     copy->window = window;
     dest->state = (struct internal_state *)copy;

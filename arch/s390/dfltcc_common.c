@@ -16,18 +16,29 @@
 static const int PAGE_ALIGN = 0x1000;
 
 void Z_INTERNAL *PREFIX(dfltcc_alloc_window)(PREFIX3(streamp) strm, uInt items, uInt size) {
+    unsigned int n;
     void *p;
     void *w;
 
     /* To simplify freeing, we store the pointer to the allocated buffer right
      * before the window.
      */
-    p = ZALLOC(strm, sizeof(void *) + items * size + PAGE_ALIGN, sizeof(unsigned char));
+    n = items * size;
+    if (n < HB_SIZE)
+      /* DFLTCC always uses HB_SIZE bytes. */
+      n = HB_SIZE;
+    p = ZALLOC(strm, sizeof(void *) + n + PAGE_ALIGN, sizeof(unsigned char));
     if (p == NULL)
         return NULL;
     w = ALIGN_UP((char *)p + sizeof(void *), PAGE_ALIGN);
     *(void **)((char *)w - sizeof(void *)) = p;
     return w;
+}
+
+void Z_INTERNAL PREFIX(dfltcc_copy_window)(void *dest, const void *src, size_t n) {
+    if (n < HB_SIZE)
+      n = HB_SIZE;
+    memcpy(dest, src, n);
 }
 
 void Z_INTERNAL PREFIX(dfltcc_free_window)(PREFIX3(streamp) strm, void *w) {
