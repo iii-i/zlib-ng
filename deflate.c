@@ -365,7 +365,7 @@ static int deflateStateCheck (PREFIX3(stream) *strm) {
 /* ========================================================================= */
 int32_t Z_EXPORT PREFIX(deflateSetDictionary)(PREFIX3(stream) *strm, const uint8_t *dictionary, uint32_t dictLength) {
     deflate_state *s;
-    unsigned int str, n;
+    unsigned int str, n, i;
     int wrap;
     uint32_t avail;
     const unsigned char *next;
@@ -404,6 +404,8 @@ int32_t Z_EXPORT PREFIX(deflateSetDictionary)(PREFIX3(stream) *strm, const uint8
     while (s->lookahead >= STD_MIN_MATCH) {
         str = s->strstart;
         n = s->lookahead - (STD_MIN_MATCH - 1);
+        for (i = 0; i < n; i++)
+            s->quick_insert_string(s, str + i);
         functable.insert_string(s, str, n);
         s->strstart = str + n;
         s->lookahead = STD_MIN_MATCH - 1;
