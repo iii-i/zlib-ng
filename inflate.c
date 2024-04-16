@@ -53,7 +53,7 @@ static int inflateStateCheck(PREFIX3(stream) *strm) {
     if (strm == NULL || strm->zalloc == NULL || strm->zfree == NULL)
         return 1;
     state = (struct inflate_state *)strm->state;
-    if (state == NULL || state->strm != strm || state->mode < HEAD || state->mode > SYNC)
+    if (state == NULL || state->alloc_bufs == NULL || state->strm != strm || state->mode < HEAD || state->mode > SYNC)
         return 1;
     return 0;
 }
@@ -120,13 +120,9 @@ int32_t Z_EXPORT PREFIX(inflateReset2)(PREFIX3(stream) *strm, int32_t windowBits
 #endif
     }
 
-    /* set number of window bits, free window if different */
+    /* set number of window bits */
     if (windowBits && (windowBits < MIN_WBITS || windowBits > MAX_WBITS))
         return Z_STREAM_ERROR;
-    if (state->window != NULL && state->wbits != (unsigned)windowBits) {
-        ZFREE_WINDOW(strm, state->window);
-        state->window = NULL;
-    }
 
     /* update state and reset the rest of it */
     state->wrap = wrap;
@@ -134,7 +130,88 @@ int32_t Z_EXPORT PREFIX(inflateReset2)(PREFIX3(stream) *strm, int32_t windowBits
     return PREFIX(inflateReset)(strm);
 }
 
-/* This function is hidden in ZLIB_COMPAT builds. */
+#ifdef INF_ALLOC_DEBUG
+#  include <stdio.h>
+#  define LOGSZ(name,size)           fprintf(stderr, "%s is %d bytes\n", name, size)
+#  define LOGSZP(name,size,loc,pad)  fprintf(stderr, "%s is %d bytes, offset %d, padded %d\n", name, size, loc, pad)
+#  define LOGSZPL(name,size,loc,pad) fprintf(stderr, "%s is %d bytes, offset %ld, padded %d\n", name, size, loc, pad)
+#else
+#  define LOGSZ(name,size)
+#  define LOGSZP(name,size,loc,pad)
+#  define LOGSZPL(name,size,loc,pad)
+#endif
+
+/* ===========================================================================
+ * Allocate a big buffer and divide it up into the various buffers inflate needs.
+ * Handles alignment of allocated buffer and alignment of individual buffers.
+ */
+Z_INTERNAL inflate_allocs* alloc_inflate(PREFIX3(stream) *strm) {
+    int currsize = 0;
+
+    /* Define sizes */
+    int window_size = (1 << MAX_WBITS) + 64; /* 64B padding for chunksize */
+    int state_size = sizeof(inflate_state);
+    int alloc_size = sizeof(inflate_allocs);
+
+    /* Calculate relative buffer positions and paddings */
+    LOGSZP("window", window_size, PAD_64(currsize), PADSZ(currsize,64));
+    int window_pos = PAD_64(currsize);
+    currsize = window_pos + window_size;
+
+    LOGSZP("state", state_size, PAD_64(currsize), PADSZ(currsize,64));
+    int state_pos = PAD_64(currsize);
+    currsize = state_pos + state_size;
+
+    LOGSZP("alloc", alloc_size, PAD_16(currsize), PADSZ(currsize,16));
+    int alloc_pos = PAD_16(currsize);
+    currsize = alloc_pos + alloc_size;
+
+    /* Add 64 to allow our alignment, and round size of buffer up to multiple of 64 */
+    int totalsize = PAD_64(currsize + 63);
+
+    /* Allocate buffer, align to 64-byte cacheline, and zerofill the resulting buffer */
+    char *origbuff = strm->zalloc(strm->opaque, 1, totalsize);
+    if (origbuff == NULL)
+        return NULL;
+
+    char *buff = (char *)HINT_ALIGNED_64((char *)PAD_64(origbuff));
+    LOGSZPL("Buffer alloc", totalsize, PADSZ((uintptr_t)origbuff,64), PADSZ(currsize,64));
+
+    /* Initialize alloc_bufs */
+    inflate_allocs *alloc_bufs  = (struct inflate_allocs_s *)(buff + alloc_pos);
+    alloc_bufs->buf_start = (char *)origbuff;
+    alloc_bufs->zfree = strm->zfree;
+
+    alloc_bufs->window =  (unsigned char *)HINT_ALIGNED_64((buff + window_pos));
+    alloc_bufs->state = (inflate_state *)HINT_ALIGNED_64((buff + state_pos));
+
+#ifdef Z_MEMORY_SANITIZER
+    /* This is _not_ to subvert the memory sanitizer but to instead unposion some
+       data we willingly and purposefully load uninitialized into vector registers
+       in order to safely read the last < chunksize bytes of the window. */
+    __msan_unpoison(alloc_bufs->window + window_size + 64, 64);
+#endif
+
+    return alloc_bufs;
+}
+
+/* ===========================================================================
+ * Free all allocated inflate buffers
+ */
+Z_INTERNAL void free_inflate(PREFIX3(stream) *strm) {
+    struct inflate_state *state = (struct inflate_state *)strm->state;
+
+    if (state->alloc_bufs != NULL) {
+        inflate_allocs *alloc_bufs = state->alloc_bufs;
+        alloc_bufs->zfree(strm->opaque, alloc_bufs->buf_start);
+        strm->state = NULL;
+    }
+}
+
+/* ===========================================================================
+ * Initialize inflate state and buffers.
+ * This function is hidden in ZLIB_COMPAT builds.
+ */
 int32_t ZNG_CONDEXPORT PREFIX(inflateInit2)(PREFIX3(stream) *strm, int32_t windowBits) {
     int32_t ret;
     struct inflate_state *state;
@@ -151,19 +228,23 @@ int32_t ZNG_CONDEXPORT PREFIX(inflateInit2)(PREFIX3(stream) *strm, int32_t windo
     }
     if (strm->zfree == NULL)
         strm->zfree = PREFIX(zcfree);
-    state = ZALLOC_INFLATE_STATE(strm);
-    if (state == NULL)
+
+    inflate_allocs *alloc_bufs = alloc_inflate(strm);
+    if (alloc_bufs == NULL)
         return Z_MEM_ERROR;
+
+    state = alloc_bufs->state;
+    state->window = alloc_bufs->window;
+    state->alloc_bufs = alloc_bufs;
     Tracev((stderr, "inflate: allocated\n"));
+
     strm->state = (struct internal_state *)state;
     state->strm = strm;
-    state->window = NULL;
     state->mode = HEAD;     /* to pass state test in inflateReset2() */
     state->chunksize = FUNCTABLE_CALL(chunksize)();
     ret = PREFIX(inflateReset2)(strm, windowBits);
     if (ret != Z_OK) {
-        ZFREE_STATE(strm, state);
-        strm->state = NULL;
+        free_inflate(strm);
     }
     return ret;
 }
@@ -223,20 +304,6 @@ void Z_INTERNAL PREFIX(fixedtables)(struct inflate_state *state) {
 }
 
 int Z_INTERNAL PREFIX(inflate_ensure_window)(struct inflate_state *state) {
-    /* if it hasn't been done already, allocate space for the window */
-    if (state->window == NULL) {
-        unsigned wsize = 1U << state->wbits;
-        state->window = (unsigned char *)ZALLOC_WINDOW(state->strm, wsize + state->chunksize, sizeof(unsigned char));
-        if (state->window == NULL)
-            return Z_MEM_ERROR;
-#ifdef Z_MEMORY_SANITIZER
-        /* This is _not_ to subvert the memory sanitizer but to instead unposion some
-           data we willingly and purposefully load uninitialized into vector registers
-           in order to safely read the last < chunksize bytes of the window. */
-        __msan_unpoison(state->window + wsize, state->chunksize);
-#endif
-    }
-
     /* if window not in use yet, initialize */
     if (state->wsize == 0) {
         state->wsize = 1U << state->wbits;
@@ -1142,14 +1209,12 @@ int32_t Z_EXPORT PREFIX(inflate)(PREFIX3(stream) *strm, int32_t flush) {
 }
 
 int32_t Z_EXPORT PREFIX(inflateEnd)(PREFIX3(stream) *strm) {
-    struct inflate_state *state;
     if (inflateStateCheck(strm))
         return Z_STREAM_ERROR;
-    state = (struct inflate_state *)strm->state;
-    if (state->window != NULL)
-        ZFREE_WINDOW(strm, state->window);
-    ZFREE_STATE(strm, strm->state);
-    strm->state = NULL;
+
+    /* Free allocated buffers */
+    free_inflate(strm);
+
     Tracev((stderr, "inflate: end\n"));
     return Z_OK;
 }
@@ -1332,13 +1397,16 @@ int32_t Z_EXPORT PREFIX(inflateCopy)(PREFIX3(stream) *dest, PREFIX3(stream) *sou
         return Z_STREAM_ERROR;
     state = (struct inflate_state *)source->state;
 
+    memcpy((void *)dest, (void *)source, sizeof(PREFIX3(stream)));
+
     /* allocate space */
-    copy = ZALLOC_INFLATE_STATE(source);
-    if (copy == NULL)
+    inflate_allocs *alloc_bufs = alloc_inflate(dest);
+    if (alloc_bufs == NULL)
         return Z_MEM_ERROR;
+    copy = alloc_bufs->state;
+    copy->window = alloc_bufs->window;
 
     /* copy state */
-    memcpy((void *)dest, (void *)source, sizeof(PREFIX3(stream)));
     ZCOPY_INFLATE_STATE(copy, state);
     copy->strm = dest;
     if (state->lencode >= state->codes && state->lencode <= state->codes + ENOUGH - 1) {
@@ -1346,16 +1414,10 @@ int32_t Z_EXPORT PREFIX(inflateCopy)(PREFIX3(stream) *dest, PREFIX3(stream) *sou
         copy->distcode = copy->codes + (state->distcode - state->codes);
     }
     copy->next = copy->codes + (state->next - state->codes);
+    copy->alloc_bufs = alloc_bufs;
 
     /* window */
-    copy->window = NULL;
-    if (state->window != NULL) {
-        if (PREFIX(inflate_ensure_window)(copy)) {
-            ZFREE_STATE(source, copy);
-            return Z_MEM_ERROR;
-        }
-        ZCOPY_WINDOW(copy->window, state->window, (size_t)state->wsize);
-    }
+    ZCOPY_WINDOW(copy->window, state->window, (size_t)state->wsize);
 
     dest->state = (struct internal_state *)copy;
     return Z_OK;

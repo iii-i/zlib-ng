@@ -12,13 +12,9 @@
 #  include "arch/s390/dfltcc_inflate.h"
 #else
 /* Memory management for the inflate state. Useful for allocating arch-specific extension blocks. */
-#  define ZALLOC_INFLATE_STATE(strm) ((struct inflate_state *)ZALLOC(strm, 1, sizeof(struct inflate_state)))
-#  define ZFREE_STATE(strm, addr) ZFREE(strm, addr)
 #  define ZCOPY_INFLATE_STATE(dst, src) memcpy(dst, src, sizeof(struct inflate_state))
 /* Memory management for the window. Useful for allocation the aligned window. */
-#  define ZALLOC_WINDOW(strm, items, size) ZALLOC(strm, items, size)
 #  define ZCOPY_WINDOW(dest, src, n) memcpy(dest, src, n)
-#  define ZFREE_WINDOW(strm, addr) ZFREE(strm, addr)
 /* Invoked at the end of inflateResetKeep(). Useful for initializing arch-specific extension blocks. */
 #  define INFLATE_RESET_KEEP_HOOK(strm) do {} while (0)
 /* Invoked at the beginning of inflatePrime(). Useful for updating arch-specific buffers. */
