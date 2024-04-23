@@ -154,8 +154,8 @@ Z_INTERNAL inflate_allocs* alloc_inflate(PREFIX3(stream) *strm) {
     int alloc_size = sizeof(inflate_allocs);
 
     /* Calculate relative buffer positions and paddings */
-    LOGSZP("window", window_size, PAD_64(curr_size), PADSZ(curr_size,64));
-    int window_pos = PAD_64(curr_size);
+    LOGSZP("window", window_size, PAD_WINDOW(curr_size), PADSZ(curr_size,WINDOW_PAD_SIZE));
+    int window_pos = PAD_WINDOW(curr_size);
     curr_size = window_pos + window_size;
 
     LOGSZP("state", state_size, PAD_64(curr_size), PADSZ(curr_size,64));
@@ -166,23 +166,23 @@ Z_INTERNAL inflate_allocs* alloc_inflate(PREFIX3(stream) *strm) {
     int alloc_pos = PAD_16(curr_size);
     curr_size = alloc_pos + alloc_size;
 
-    /* Add 64 to allow our alignment, and round size of buffer up to multiple of 64 */
-    int total_size = PAD_64(curr_size + 63);
+    /* Add 64-1 or 4096-1 to allow window alignment, and round size of buffer up to multiple of 64 */
+    int total_size = PAD_64(curr_size + (WINDOW_PAD_SIZE - 1));
 
     /* Allocate buffer, align to 64-byte cacheline, and zerofill the resulting buffer */
     char *original_buf = strm->zalloc(strm->opaque, 1, total_size);
     if (original_buf == NULL)
         return NULL;
 
-    char *buff = (char *)HINT_ALIGNED_64((char *)PAD_64(original_buf));
-    LOGSZPL("Buffer alloc", total_size, PADSZ((uintptr_t)original_buf,64), PADSZ(curr_size,64));
+    char *buff = (char *)HINT_ALIGNED_WINDOW((char *)PAD_WINDOW(original_buf));
+    LOGSZPL("Buffer alloc", total_size, PADSZ((uintptr_t)original_buf,WINDOW_PAD_SIZE), PADSZ(curr_size,WINDOW_PAD_SIZE));
 
     /* Initialize alloc_bufs */
     inflate_allocs *alloc_bufs  = (struct inflate_allocs_s *)(buff + alloc_pos);
     alloc_bufs->buf_start = (char *)original_buf;
     alloc_bufs->zfree = strm->zfree;
 
-    alloc_bufs->window =  (unsigned char *)HINT_ALIGNED_64((buff + window_pos));
+    alloc_bufs->window =  (unsigned char *)HINT_ALIGNED_WINDOW((buff + window_pos));
     alloc_bufs->state = (inflate_state *)HINT_ALIGNED_64((buff + state_pos));
 
 #ifdef Z_MEMORY_SANITIZER

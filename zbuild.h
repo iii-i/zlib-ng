@@ -207,16 +207,18 @@
 #else
 #  define HINT_ALIGNED(p,n) (p)
 #endif
-#define HINT_ALIGNED_64(p) HINT_ALIGNED((p),64)
 #define HINT_ALIGNED_16(p) HINT_ALIGNED((p),16)
+#define HINT_ALIGNED_64(p) HINT_ALIGNED((p),64)
+#define HINT_ALIGNED_4096(p) HINT_ALIGNED((p),4096)
 
 /* PADSZ returns needed bytes to pad bpos to pad size
  * PAD_NN calculates pad size and adds it to bpos, returning the result.
  * All take an integer or a pointer as bpos input.
  */
 #define PADSZ(bpos, pad) (((pad) - ((uintptr_t)(bpos) % (pad))) % (pad))
-#define PAD_64(bpos) ((bpos) + PADSZ((bpos),64))
 #define PAD_16(bpos) ((bpos) + PADSZ((bpos),16))
+#define PAD_64(bpos) ((bpos) + PADSZ((bpos),64))
+#define PAD_4096(bpos) ((bpos) + PADSZ((bpos),4096))
 
 /* Diagnostic functions */
 #ifdef ZLIB_DEBUG

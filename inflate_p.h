@@ -10,7 +10,14 @@
 /* Architecture-specific hooks. */
 #ifdef S390_DFLTCC_INFLATE
 #  include "arch/s390/dfltcc_inflate.h"
+/* DFLTCC instructions require window to be page-aligned */
+#  define PAD_WINDOW            PAD_4096
+#  define WINDOW_PAD_SIZE       4096
+#  define HINT_ALIGNED_WINDOW   HINT_ALIGNED_4096
 #else
+#  define PAD_WINDOW            PAD_64
+#  define WINDOW_PAD_SIZE       64
+#  define HINT_ALIGNED_WINDOW   HINT_ALIGNED_64
 /* Memory management for the window. Useful for allocation the aligned window. */
 #  define ZCOPY_WINDOW(dest, src, n) memcpy(dest, src, n)
 /* Invoked at the end of inflateResetKeep(). Useful for initializing arch-specific extension blocks. */

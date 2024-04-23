@@ -71,7 +71,14 @@ const char PREFIX(deflate_copyright)[] = " deflate 1.3.1 Copyright 1995-2024 Jea
  */
 #ifdef S390_DFLTCC_DEFLATE
 #  include "arch/s390/dfltcc_deflate.h"
+/* DFLTCC instructions require window to be page-aligned */
+#  define PAD_WINDOW            PAD_4096
+#  define WINDOW_PAD_SIZE       4096
+#  define HINT_ALIGNED_WINDOW   HINT_ALIGNED_4096
 #else
+#  define PAD_WINDOW            PAD_64
+#  define WINDOW_PAD_SIZE       64
+#  define HINT_ALIGNED_WINDOW   HINT_ALIGNED_64
 /* Invoked at the beginning of deflateSetDictionary(). Useful for checking arch-specific window data. */
 #  define DEFLATE_SET_DICTIONARY_HOOK(strm, dict, dict_len) do {} while (0)
 /* Invoked at the beginning of deflateGetDictionary(). Useful for adjusting arch-specific window data. */
@@ -202,8 +209,8 @@ Z_INTERNAL deflate_allocs* alloc_deflate(PREFIX3(stream) *strm, int windowBits, 
     int alloc_size = sizeof(deflate_allocs);
 
     /* Calculate relative buffer positions and paddings */
-    LOGSZP("window", window_size, PAD_64(curr_size), PADSZ(curr_size,64));
-    int window_pos = PAD_64(curr_size);
+    LOGSZP("window", window_size, PAD_WINDOW(curr_size), PADSZ(curr_size,WINDOW_PAD_SIZE));
+    int window_pos = PAD_WINDOW(curr_size);
     curr_size = window_pos + window_size;
 
     LOGSZP("prev", prev_size, PAD_64(curr_size), PADSZ(curr_size,64));
@@ -226,16 +233,16 @@ Z_INTERNAL deflate_allocs* alloc_deflate(PREFIX3(stream) *strm, int windowBits, 
     int alloc_pos = PAD_16(curr_size);
     curr_size = alloc_pos + alloc_size;
 
-    /* Add 64 to allow our alignment, and round size of buffer up to multiple of 64 */
-    int total_size = PAD_64(63 + curr_size);
+    /* Add 64-1 or 4096-1 to allow window alignment, and round size of buffer up to multiple of 64 */
+    int total_size = PAD_64(curr_size + (WINDOW_PAD_SIZE - 1));
 
     /* Allocate buffer, align to 64-byte cacheline, and zerofill the resulting buffer */
     char *original_buf = strm->zalloc(strm->opaque, 1, total_size);
     if (original_buf == NULL)
         return NULL;
 
-    char *buff = (char *)HINT_ALIGNED_64((char *)PAD_64(original_buf));
-    LOGSZPL("Buffer alloc", total_size, PADSZ((uintptr_t)original_buf,64), PADSZ(curr_size,64));
+    char *buff = (char *)HINT_ALIGNED_WINDOW((char *)PAD_WINDOW(original_buf));
+    LOGSZPL("Buffer alloc", total_size, PADSZ((uintptr_t)original_buf,WINDOW_PAD_SIZE), PADSZ(curr_size,WINDOW_PAD_SIZE));
 
     /* Initialize alloc_bufs */
     deflate_allocs *alloc_bufs  = (struct deflate_allocs_s *)(buff + alloc_pos);
@@ -243,7 +250,7 @@ Z_INTERNAL deflate_allocs* alloc_deflate(PREFIX3(stream) *strm, int windowBits, 
     alloc_bufs->zfree = strm->zfree;
 
     /* Assign buffers */
-    alloc_bufs->window = (unsigned char *)HINT_ALIGNED_64(buff + window_pos);
+    alloc_bufs->window = (unsigned char *)HINT_ALIGNED_WINDOW(buff + window_pos);
     alloc_bufs->prev = (Pos *)HINT_ALIGNED_64(buff + prev_pos);
     alloc_bufs->head = (Pos *)HINT_ALIGNED_64(buff + head_pos);
     alloc_bufs->pending_buf = (unsigned char *)HINT_ALIGNED_64(buff + pending_pos);
