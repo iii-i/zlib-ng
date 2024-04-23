@@ -154,8 +154,8 @@ Z_INTERNAL inflate_allocs* alloc_inflate(PREFIX3(stream) *strm) {
     int alloc_size = sizeof(inflate_allocs);
 
     /* Calculate relative buffer positions and paddings */
-    LOGSZP("window", window_size, PAD_64(currsize), PADSZ(currsize,64));
-    int window_pos = PAD_64(currsize);
+    LOGSZP("window", window_size, PAD_WINDOW(currsize), PADSZ(currsize,WINDOW_PAD_SIZE));
+    int window_pos = PAD_WINDOW(currsize);
     currsize = window_pos + window_size;
 
     LOGSZP("state", state_size, PAD_64(currsize), PADSZ(currsize,64));
@@ -166,23 +166,23 @@ Z_INTERNAL inflate_allocs* alloc_inflate(PREFIX3(stream) *strm) {
     int alloc_pos = PAD_16(currsize);
     currsize = alloc_pos + alloc_size;
 
-    /* Add 64 to allow our alignment, and round size of buffer up to multiple of 64 */
-    int totalsize = PAD_64(currsize + 63);
+    /* Add 64-1 or 4096-1 to allow window alignment, and round size of buffer up to multiple of 64 */
+    int totalsize = PAD_64(currsize + (WINDOW_PAD_SIZE - 1));
 
     /* Allocate buffer, align to 64-byte cacheline, and zerofill the resulting buffer */
     char *origbuff = strm->zalloc(strm->opaque, 1, totalsize);
     if (origbuff == NULL)
         return NULL;
 
-    char *buff = (char *)HINT_ALIGNED_64((char *)PAD_64(origbuff));
-    LOGSZPL("Buffer alloc", totalsize, PADSZ((uintptr_t)origbuff,64), PADSZ(currsize,64));
+    char *buff = (char *)HINT_ALIGNED_WINDOW((char *)PAD_WINDOW(origbuff));
+    LOGSZPL("Buffer alloc", totalsize, PADSZ((uintptr_t)origbuff,WINDOW_PAD_SIZE), PADSZ(currsize,WINDOW_PAD_SIZE));
 
     /* Initialize alloc_bufs */
     inflate_allocs *alloc_bufs  = (struct inflate_allocs_s *)(buff + alloc_pos);
     alloc_bufs->buf_start = (char *)origbuff;
     alloc_bufs->zfree = strm->zfree;
 
-    alloc_bufs->window =  (unsigned char *)HINT_ALIGNED_64((buff + window_pos));
+    alloc_bufs->window =  (unsigned char *)HINT_ALIGNED_WINDOW((buff + window_pos));
     alloc_bufs->state = (inflate_state *)HINT_ALIGNED_64((buff + state_pos));
 
 #ifdef Z_MEMORY_SANITIZER
