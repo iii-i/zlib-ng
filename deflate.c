@@ -78,8 +78,6 @@ const char PREFIX(deflate_copyright)[] = " deflate 1.3.1 Copyright 1995-2024 Jea
 #  define PAD_WINDOW            PAD_64
 #  define WINDOW_PAD_SIZE       64
 #  define HINT_ALIGNED_WINDOW   HINT_ALIGNED_64
-/* Memory management for the deflate state. */
-#  define ZCOPY_DEFLATE_STATE(dst, src) memcpy(dst, src, sizeof(deflate_state))
 /* Invoked at the beginning of deflateSetDictionary(). Useful for checking arch-specific window data. */
 #  define DEFLATE_SET_DICTIONARY_HOOK(strm, dict, dict_len) do {} while (0)
 /* Invoked at the beginning of deflateGetDictionary(). Useful for adjusting arch-specific window data. */
@@ -1150,7 +1148,7 @@ int32_t Z_EXPORT PREFIX(deflateCopy)(PREFIX3(stream) *dest, PREFIX3(stream) *sou
     ds = alloc_bufs->state;
 
     dest->state = (struct internal_state *) ds;
-    ZCOPY_DEFLATE_STATE(ds, ss);
+    memcpy(ds, ss, sizeof(deflate_state));
     ds->strm = dest;
 
     ds->alloc_bufs = alloc_bufs;

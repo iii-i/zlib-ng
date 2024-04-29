@@ -17,8 +17,6 @@
 #  define PAD_WINDOW            PAD_64
 #  define WINDOW_PAD_SIZE       64
 #  define HINT_ALIGNED_WINDOW   HINT_ALIGNED_64
-/* Memory management for the inflate state. Useful for allocating arch-specific extension blocks. */
-#  define ZCOPY_INFLATE_STATE(dst, src) memcpy(dst, src, sizeof(struct inflate_state))
 /* Memory management for the window. Useful for allocation the aligned window. */
 #  define ZCOPY_WINDOW(dest, src, n) memcpy(dest, src, n)
 /* Invoked at the end of inflateResetKeep(). Useful for initializing arch-specific extension blocks. */

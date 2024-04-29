@@ -29,10 +29,6 @@ struct dfltcc_deflate_state {
 
 #define GET_DFLTCC_DEFLATE_STATE(state) ((struct dfltcc_deflate_state *)GET_DFLTCC_STATE(state))
 
-void Z_INTERNAL *PREFIX(dfltcc_alloc_deflate_state)(PREFIX3(streamp) strm) {
-    return dfltcc_alloc_state(strm, sizeof(deflate_state), sizeof(struct dfltcc_deflate_state));
-}
-
 void Z_INTERNAL PREFIX(dfltcc_reset_deflate_state)(PREFIX3(streamp) strm) {
     deflate_state *state = (deflate_state *)strm->state;
     struct dfltcc_deflate_state *dfltcc_state = GET_DFLTCC_DEFLATE_STATE(state);
@@ -44,10 +40,6 @@ void Z_INTERNAL PREFIX(dfltcc_reset_deflate_state)(PREFIX3(streamp) strm) {
     dfltcc_state->block_size = DFLTCC_BLOCK_SIZE;
     dfltcc_state->block_threshold = DFLTCC_FIRST_FHT_BLOCK_SIZE;
     dfltcc_state->dht_threshold = DFLTCC_DHT_MIN_SAMPLE_SIZE;
-}
-
-void Z_INTERNAL PREFIX(dfltcc_copy_deflate_state)(void *dst, const void *src) {
-    dfltcc_copy_state(dst, src, sizeof(deflate_state), sizeof(struct dfltcc_deflate_state));
 }
 
 static inline int dfltcc_can_deflate_with_params(PREFIX3(streamp) strm, int level, uInt window_bits, int strategy,

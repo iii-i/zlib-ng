@@ -14,6 +14,13 @@
 #include "zendian.h"
 #include "crc32.h"
 
+#ifdef S390_DFLTCC_DEFLATE
+#  include "arch/s390/dfltcc_state.h"
+typedef struct dfltcc_state arch_deflate_state;
+#else
+typedef struct {} arch_deflate_state;
+#endif
+
 /* define NO_GZIP when compiling if you want to disable gzip header and
    trailer creation by deflate().  NO_GZIP would be used to avoid linking in
    the crc code when it is not needed.  For shared libraries, gzip encoding
@@ -315,6 +322,9 @@ struct ALIGNED_(64) internal_state {
 
     /* Reserved for future use and alignment purposes */
     int32_t reserved[11];
+
+    /* Architecture-specific extensions */
+    arch_deflate_state arch;
 };
 
 typedef enum {
