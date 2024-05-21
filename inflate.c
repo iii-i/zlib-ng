@@ -1405,7 +1405,6 @@ int32_t Z_EXPORT PREFIX(inflateCopy)(PREFIX3(stream) *dest, PREFIX3(stream) *sou
     if (alloc_bufs == NULL)
         return Z_MEM_ERROR;
     copy = alloc_bufs->state;
-    copy->window = alloc_bufs->window;
 
     /* copy state */
     memcpy(copy, state, sizeof(struct inflate_state));
@@ -1416,6 +1415,7 @@ int32_t Z_EXPORT PREFIX(inflateCopy)(PREFIX3(stream) *dest, PREFIX3(stream) *sou
     }
     copy->next = copy->codes + (state->next - state->codes);
     copy->alloc_bufs = alloc_bufs;
+    copy->window = alloc_bufs->window;
 
     /* window */
     ZCOPY_WINDOW(copy->window, state->window, (size_t)state->wsize);
