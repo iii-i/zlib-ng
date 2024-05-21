@@ -149,12 +149,12 @@ Z_INTERNAL inflate_allocs* alloc_inflate(PREFIX3(stream) *strm) {
     int curr_size = 0;
 
     /* Define sizes */
-    int window_size = (1 << MAX_WBITS) + 64; /* 64B padding for chunksize */
+    int window_size = INFLATE_ADJUST_WINDOW_SIZE((1 << MAX_WBITS) + 64); /* 64B padding for chunksize */
     int state_size = sizeof(inflate_state);
     int alloc_size = sizeof(inflate_allocs);
 
     /* Calculate relative buffer positions and paddings */
-    LOGSZP("window", window_size, PAD_WINDOW(curr_size), PADSZ(curr_size,WINDOW_PAD_SIZE));
+    LOGSZP("window", window_size, PAD_WINDOW(curr_size), PADSZ(curr_size, WINDOW_PAD_SIZE));
     int window_pos = PAD_WINDOW(curr_size);
     curr_size = window_pos + window_size;
 
@@ -1418,7 +1418,7 @@ int32_t Z_EXPORT PREFIX(inflateCopy)(PREFIX3(stream) *dest, PREFIX3(stream) *sou
     copy->window = alloc_bufs->window;
 
     /* window */
-    ZCOPY_WINDOW(copy->window, state->window, (size_t)state->wsize);
+    memcpy(copy->window, state->window, INFLATE_ADJUST_WINDOW_SIZE((size_t)state->wsize));
 
     dest->state = (struct internal_state *)copy;
     return Z_OK;

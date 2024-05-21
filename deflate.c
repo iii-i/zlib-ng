@@ -101,6 +101,8 @@ const char PREFIX(deflate_copyright)[] = " deflate 1.3.1 Copyright 1995-2024 Jea
 #  define DEFLATE_NEED_CHECKSUM(strm) 1
 /* Returns whether reproducibility parameter can be set to a given value. */
 #  define DEFLATE_CAN_SET_REPRODUCIBLE(strm, reproducible) 1
+/* Adjust the window size for the arch-specific deflate code. */
+#  define DEFLATE_ADJUST_WINDOW_SIZE(n) (n)
 #endif
 
 /* ===========================================================================
@@ -201,7 +203,7 @@ Z_INTERNAL deflate_allocs* alloc_deflate(PREFIX3(stream) *strm, int windowBits, 
     int curr_size = 0;
 
     /* Define sizes */
-    int window_size = (1 << windowBits) * 2;
+    int window_size = DEFLATE_ADJUST_WINDOW_SIZE((1 << windowBits) * 2);
     int prev_size = (1 << windowBits) * sizeof(Pos);
     int head_size = HASH_SIZE * sizeof(Pos);
     int pending_size = lit_bufsize * LIT_BUFS;
@@ -209,7 +211,7 @@ Z_INTERNAL deflate_allocs* alloc_deflate(PREFIX3(stream) *strm, int windowBits, 
     int alloc_size = sizeof(deflate_allocs);
 
     /* Calculate relative buffer positions and paddings */
-    LOGSZP("window", window_size, PAD_WINDOW(curr_size), PADSZ(curr_size,WINDOW_PAD_SIZE));
+    LOGSZP("window", window_size, PAD_WINDOW(curr_size), PADSZ(curr_size, WINDOW_PAD_SIZE));
     int window_pos = PAD_WINDOW(curr_size);
     curr_size = window_pos + window_size;
 
@@ -1158,7 +1160,7 @@ int32_t Z_EXPORT PREFIX(deflateCopy)(PREFIX3(stream) *dest, PREFIX3(stream) *sou
         return Z_MEM_ERROR;
     }
 
-    memcpy(ds->window, ss->window, ds->w_size * 2 * sizeof(unsigned char));
+    memcpy(ds->window, ss->window, DEFLATE_ADJUST_WINDOW_SIZE(ds->w_size * 2 * sizeof(unsigned char)));
     memcpy((void *)ds->prev, (void *)ss->prev, ds->w_size * sizeof(Pos));
     memcpy((void *)ds->head, (void *)ss->head, HASH_SIZE * sizeof(Pos));
     memcpy(ds->pending_buf, ss->pending_buf, ds->lit_bufsize * LIT_BUFS);

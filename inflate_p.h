@@ -18,8 +18,6 @@
 #  define PAD_WINDOW            PAD_64
 #  define WINDOW_PAD_SIZE       64
 #  define HINT_ALIGNED_WINDOW   HINT_ALIGNED_64
-/* Memory management for the window. Useful for allocation the aligned window. */
-#  define ZCOPY_WINDOW(dest, src, n) memcpy(dest, src, n)
 /* Invoked at the end of inflateResetKeep(). Useful for initializing arch-specific extension blocks. */
 #  define INFLATE_RESET_KEEP_HOOK(strm) do {} while (0)
 /* Invoked at the beginning of inflatePrime(). Useful for updating arch-specific buffers. */
@@ -38,6 +36,8 @@
 #  define INFLATE_SET_DICTIONARY_HOOK(strm, dict, dict_len) do {} while (0)
 /* Invoked at the beginning of inflateGetDictionary(). Useful for adjusting arch-specific window data. */
 #  define INFLATE_GET_DICTIONARY_HOOK(strm, dict, dict_len) do {} while (0)
+/* Adjust the window size for the arch-specific inflate code. */
+#  define INFLATE_ADJUST_WINDOW_SIZE(n) (n)
 #endif
 
 /*
